@@ -9,8 +9,7 @@ from RPA.Excel.Files import Files
 
 http = HTTP()
 files = Files()
-browser = Selenium(timeout=timedelta(seconds=15),
-                   implicit_wait=timedelta(seconds=15))
+browser = Selenium()
 
 
 @task
@@ -25,192 +24,165 @@ def order_robots_from_RobotSpareBin():
 
     search_phrase = 'Carnaval'
     target_category = 'World & Nation'
-    number_of_months = 100
+    number_of_months = 500
 
-    open_website(search_phrase)
-    worksheet_data = extract_news(search_phrase, number_of_months)
-
-    # category_elem = get_target_category_elem(target_category)
-
-    # if category_elem is not None:
-    #    category_elem.click()
-
-    files.create_workbook(path="./output/result.xlsx")
-    files.create_worksheet(name="Result",
-                           content=worksheet_data, header=True)
-    files.save_workbook(path="./output/result.xlsx")
+    open_website()
+    search_for_phrase(search_phrase)
+    change_category_and_sort(target_category)
+    total_pages = get_number_of_pages()
+    limit_date = get_news_limit_date(number_of_months)
+    worksheet_data = extract_valid_news(search_phrase, total_pages, limit_date)
+    create_excel_file(worksheet_data)
 
 
-def open_website(search_phrase):
+def open_website():
+    browser.open_available_browser(f'https://www.latimes.com', maximized=True)
 
-    browser.open_available_browser(
-        f'https://www.latimes.com/search?q={search_phrase}&s=1&p=1', maximized=True)
 
-    """
-    browser.click_element("css=button[data-element='search-button']")
+def search_for_phrase(search_phrase):
+
+    browser.click_button_when_visible(
+        "css=button[data-element='search-button']")
+
+    browser.wait_until_element_is_visible(
+        "css=input[data-element='search-form-input']")
 
     browser.input_text(
         "css=input[data-element='search-form-input']", search_phrase)
 
-    browser.click_element("css=button[data-element='search-submit-button']")
+    browser.click_button_when_visible(
+        "css=button[data-element='search-submit-button']")
+
+
+def change_category_and_sort(target_category):
+
+    category_selected = click_element_if_possible(
+        f"//span[text()='{target_category}']/ancestor::label[input]")
+
+    if not category_selected:
+        print(f'Target category "{target_category}" not found.')
+    else:
+        browser.wait_until_page_contains_element(
+            'css=div[class="search-results-module-filters-selected"][data-showing="true"]')
+
+        wait_for_loading('css=div[class="loading-icon"]', 10)
 
     browser.select_from_list_by_label(
         "css=select[class='select-input']", "Newest")
 
-    browser.driver.refresh()
-    """
+    wait_for_loading('css=div[class="loading-icon"]', 10)
 
 
-def extract_news(search_phrase, number_of_months):
+def get_number_of_pages():
 
-    worksheet_data = []
+    browser.wait_until_element_is_visible(
+        'css=div[class="search-results-module-page-counts"]')
 
     results_count = browser.find_element(
         'css=div[class="search-results-module-page-counts"]')
 
-    match = re.search(r'(?<=of\s)[\d.,]+', results_count.text)
+    total_pages_pattern = r'(?<=of\s)[\d.,]+'
 
-    total_pages = int(match.group().replace(".", "")) if match else 0
+    match = re.search(total_pages_pattern, results_count.text)
+
+    total_pages = int(match.group().replace(",", "")) if match else 0
+
+    return total_pages
+
+
+def extract_valid_news(search_phrase, total_pages, limit_date):
+
+    worksheet_data = []
+
+    print(f'Extracting news until {limit_date}...')
 
     for current_page in range(0, total_pages):
-
-        browser.wait_until_element_is_visible(
-            "css=ul[class='search-results-module-results-menu']")
-        search_results = browser.find_element(
-            "css=ul[class='search-results-module-results-menu']")
 
         print(f'Current page: {current_page+1}')
 
-        pattern = r'(?:<img.*?src=\"(.*?)\".*?)?class="promo-title">\s+<a.*?>(.*?)<\/a>.*?class="promo-description".*?>(.*?)<\/p>.*?class=\"promo-timestamp\".*?data-timestamp=\"(.*?)\"'
+        if not extract_news_from_current_page(worksheet_data, search_phrase, limit_date):
+            print("Invalid date reached")
+            break
 
-        matches = re.finditer(
-            pattern, search_results.get_attribute('innerHTML'), flags=re.DOTALL)
-
-        for match in matches:
-
-            image_url = match.group(1)
-            title = match.group(2)
-            description = match.group(3)
-            timestamp = match.group(4)
-
-            if is_allowed_timestamp(timestamp, number_of_months):
-                print("invalid date")
-                return worksheet_data
-
-            worksheet_data.append({
-                'title': title,
-                'date': get_date_from_timestamp(timestamp),
-                'description': description,
-                'picture file': download_image(image_url, len(worksheet_data)),
-                'counter': count_search_phrases(title, description, search_phrase),
-                'contains monetary': contains_monetary(title, description)
-            })
-
-        next_page_elem = browser.find_element(
-            "css=div[class='search-results-module-next-page']")
-
-        if 'data-inactive' in next_page_elem.get_attribute('innerHTML'):
-            return worksheet_data
-
-        browser.scroll_element_into_view(next_page_elem)
-
-        browser.click_element(next_page_elem)
+        if not go_to_next_page():
+            print("Next page doesn't exist")
+            break
 
     return worksheet_data
 
 
-"""
-def get_target_category_elem(target_category):
+def extract_news_from_current_page(worksheet_data, search_phrase, limit_date):
 
-    checkboxes = browser.find_elements(
-        "css=label[class='checkbox-input-label']")
+    browser.wait_until_element_is_visible(
+        "css=ul[class='search-results-module-results-menu']")
 
-    for elem in checkboxes:
+    search_results = browser.find_element(
+        "css=ul[class='search-results-module-results-menu']")
 
-        elem.find
-        # Access last child directly using find_element
-        last_child = elem.find_element(By.XPATH, ".//last-child()")
-        inner_text = last_child.get_attribute("innerText")
+    pattern = r'(?:<img.*?src=\"(.*?)\".*?)?class="promo-title">\s+<a.*?>(.*?)<\/a>.*?class="promo-description".*?>(.*?)<\/p>.*?class=\"promo-timestamp\".*?data-timestamp=\"(.*?)\"'
 
-        if inner_text == target_category:
-            return elem
+    matches = re.finditer(
+        pattern, search_results.get_attribute('innerHTML'), flags=re.DOTALL)
 
-    return None
-    
+    for match in matches:
 
-def extract_news(search_phrase, number_of_months):
+        image_url = match.group(1)
+        title = match.group(2)
+        description = match.group(3)
+        news_date = get_date_from_timestamp(match.group(4))
 
-    worksheet_data = []
+        if news_date < limit_date:
+            return False
 
-    results_count = browser.find_element(
-        'css=div[class="search-results-module-page-counts"]')
+        worksheet_data.append({
+            'title': title,
+            'date': news_date.strftime('%Y-%m-%d'),
+            'description': description,
+            'picture file': download_image(image_url, len(worksheet_data)),
+            'counter': count_search_phrases(title, description, search_phrase),
+            'contains monetary': contains_monetary(title, description)
+        })
 
-    match = re.search(r'(?<=of\s)[\d.,]+', results_count.text)
-
-    total_pages = int(match.group().replace(".", "")) if match else 0
-
-    for current_page in range(0, total_pages):
+    return True
 
 
-        browser.driver.page_source
+def go_to_next_page():
+    next_page_elem = browser.find_element(
+        "css=div[class='search-results-module-next-page']")
+
+    if 'data-inactive' in next_page_elem.get_attribute('innerHTML'):
+        return False
+
+    browser.scroll_element_into_view(next_page_elem)
+
+    browser.click_element(next_page_elem)
+
+    return True
 
 
-        print(current_page)
+def create_excel_file(content):
+    files.create_workbook(path="./output/result.xlsx")
+    files.create_worksheet(name="Result",
+                           content=content, header=True)
+    files.save_workbook(path="./output/result.xlsx")
 
-        # browser.go_to(f'https://www.latimes.com/search?q={search_phrase}&s=1&p={str(page)}')
 
-        # class:search-results-module-main')
-        emergency = browser.find_element(
-            "css=ul[class='search-results-module-results-menu']")
+def click_element_if_possible(locator):
+    try:
+        span_element = browser.find_element(locator)
+        browser.click_element(span_element)
+    except:
+        return False
 
-        if emergency is not None:
-            print(emergency)
+    return True
 
-        browser.wait_until_element_is_visible('css=div[class="promo-wrapper"]')
-        elements = browser.find_elements('css=div[class="promo-wrapper"]')
 
-        if elements is not None:
-            print(elements)
-
-        for element in elements:
-            content = element.get_attribute('innerHTML')
-
-            pattern = r'(?:<img.*?src=\"(.*?)\".*?)?class="promo-title">\s+<a.*?>(.*?)<\/a>.*?class="promo-description".*?>(.*?)<\/p>.*?class=\"promo-timestamp\".*?data-timestamp=\"(.*?)\"'
-
-            match = re.search(pattern, content, flags=re.DOTALL)
-
-            if match:
-
-                image_url = match.group(1)
-                title = match.group(2)
-                description = match.group(3)
-                timestamp = match.group(4)
-
-                # if is_allowed_timestamp(timestamp, number_of_months):
-                #    print("invalid date")
-                #    return worksheet_data
-
-                worksheet_data.append({
-                    'title': title,
-                    'date': get_date_from_timestamp(timestamp),
-                    'description': description,
-                    'picture file': download_image(image_url, title),
-                    'counter': count_search_phrases(title, description, search_phrase),
-                    'contains monetary': contains_monetary(title, description)
-                })
-
-        browser.scroll_element_into_view(
-            "css=div[class='search-results-module-next-page']")
-
-        remove_element_if_possible(
-            'css=modality-custom-element[name="metering-bottompanel"]')
-
-        browser.click_element(
-            "css=div[class='search-results-module-next-page']")
-
-    return worksheet_data
-
-"""
+def wait_for_loading(locator, timeout):
+    try:
+        browser.wait_until_element_is_visible(locator, timeout=timeout)
+        browser.wait_until_element_is_not_visible(locator, timeout=timeout)
+    except:
+        pass
 
 
 def download_image(image_url, index):
@@ -230,15 +202,23 @@ def download_image(image_url, index):
     return file_name
 
 
-# def convert_to_valid_filename(file_name, file_extension):
-#    file_name = re.sub(r'[^\w\s]', '', file_name)
-#    return f'{file_name}.{file_extension}'
-
-
 def get_date_from_timestamp(timestamp):
-    formatted_date = datetime.fromtimestamp(
-        int(timestamp) / 1000).strftime('%Y-%m-%d')
-    return formatted_date
+    return datetime.fromtimestamp(int(timestamp) / 1000)
+
+
+def get_previous_months_first_days(num_months):
+    current_date = datetime.today().replace(hour=0, minute=0, second=0)
+    first_days = []
+
+    if num_months > 0:
+        num_months = num_months - 1
+
+    for i in range(num_months + 1):
+        target_date = current_date.replace(day=1) - timedelta(days=i*30)
+        first_day = target_date.replace(day=1)
+        first_days.append(first_day)
+
+    return min(first_days)
 
 
 def is_allowed_timestamp(timestamp, number_of_months):
@@ -247,7 +227,7 @@ def is_allowed_timestamp(timestamp, number_of_months):
 
     timestamp_date = datetime.fromtimestamp(int(timestamp) / 1000)
 
-    return timestamp_date < inferior_limit_date
+    return timestamp_date >= inferior_limit_date
 
 
 def count_search_phrases(title, description, search_phrase):
@@ -271,3 +251,18 @@ def remove_element_if_possible(locator: str):
         modal.parent.execute_script("arguments[0].hidden = true;", modal)
     except:
         print("Unable to remove element")
+
+
+def get_news_limit_date(number_of_months):
+    current_date = datetime.today().replace(day=1, hour=0, minute=0, second=0)
+    target_date = current_date.replace(day=1)
+
+    if number_of_months > 0:
+        number_of_months = number_of_months - 1
+
+    for _ in range(number_of_months):
+        target_date -= timedelta(days=target_date.day)
+        target_date -= timedelta(days=1)
+        target_date -= timedelta(days=target_date.day - 1)
+
+    return target_date
