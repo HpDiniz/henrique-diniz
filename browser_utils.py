@@ -135,3 +135,31 @@ class BrowserUtils(Selenium):
 
         self.scroll_element_into_view(locator)
         self.click_element(locator)
+
+    def remove_element_if_possible(self, locator: str, timeout: int = None):
+        """
+        Removes an element from the webpage if it is present.
+
+        This method attempts to remove the element specified by the provided locator from the webpage.
+        If a timeout is provided, it waits until the element is enabled before attempting removal.
+
+        Args:
+            locator (str): Locator for the element to be removed.
+            timeout (int, optional): Maximum time (in seconds) to wait for the element to be enabled before removal. Defaults to None.
+
+        Returns:
+            None
+        """
+
+        try:
+            if timeout:
+                self.wait_until_element_is_enabled(locator, timeout=timeout)
+        except:
+            pass
+
+        try:
+            element = self.find_element(locator)
+            element.parent.execute_script(
+                "arguments[0].hidden = true;", element)
+        except:
+            pass

@@ -76,7 +76,12 @@ def read_payload(item: workitems.Input) -> Tuple[str, str, int]:
 
 def open_website():
 
+    print("abrindo browser")
+    print(datetime.now())
     browser.open_available_browser(f'https://www.latimes.com', maximized=True)
+
+    print("abriu browser")
+    print(datetime.now())
 
 
 def search_for_phrase(search_phrase):
@@ -96,6 +101,8 @@ def change_news_category(news_category):
     if not news_category:
         return
 
+    browser.click_element_if_possible("css=span[class='see-all-text']")
+
     category_selected = browser.click_element_if_possible(
         f"//span[text()='{news_category}']/ancestor::label[input]")
 
@@ -105,7 +112,7 @@ def change_news_category(news_category):
         browser.wait_until_page_contains_element(
             'css=div[class="search-results-module-filters-selected"][data-showing="true"]')
 
-        browser.wait_for_loading('css=div[class="loading-icon"]', 10)
+        browser.wait_for_loading('css=div[class="loading-icon"]', 5)
 
 
 def sort_by_most_recent_news():
@@ -113,7 +120,7 @@ def sort_by_most_recent_news():
     browser.select_from_list_by_label(
         "css=select[class='select-input']", "Newest")
 
-    browser.wait_for_loading('css=div[class="loading-icon"]', 10)
+    browser.wait_for_loading('css=div[class="loading-icon"]', 5)
 
 
 def get_number_of_pages():
@@ -147,7 +154,12 @@ def extract_valid_news(worksheet_data: List, search_phrase: str, total_pages: in
 
 def extract_news_from_current_page(worksheet_data: List, search_phrase: str, limit_date: datetime) -> bool:
 
-    pattern = r'(?:<img.*?src=\"(.*?)\".*?)?class="promo-title">\s+<a.*?>(.*?)<\/a>.*?class="promo-description".*?>(.*?)<\/p>.*?class=\"promo-timestamp\".*?data-timestamp=\"(.*?)\"'
+    img_pattern = r'(?:<img.*?src=\"(.*?)\".*?)?'
+    title_pattern = r'class="promo-title">\s+<a.*?>(.*?)<\/a>.*?'
+    description_pattern = r'class="promo-description".*?>(.*?)<\/p>.*?'
+    timestamp_pattern = r'class=\"promo-timestamp\".*?data-timestamp=\"(.*?)\"'
+
+    pattern = img_pattern + title_pattern + description_pattern + timestamp_pattern
 
     matches = browser.find_pattern_matches_in_element(
         "css=ul[class='search-results-module-results-menu']", pattern, when_visible=True, flags=re.DOTALL)
@@ -193,8 +205,13 @@ def go_to_next_page() -> bool:
     if is_inactive:
         return False
 
-    browser.scroll_into_view_and_click_element(
+    browser.scroll_element_into_view(
         "css=div[class='search-results-module-next-page']")
+
+    browser.remove_element_if_possible(
+        "css=modality-custom-element[name='metering-bottompanel']", timeout=10)
+
+    browser.click_element("css=div[class='search-results-module-next-page']")
 
     return True
 
