@@ -1,12 +1,5 @@
 from robocorp import workitems
 from robocorp.tasks import task
-from RPA.HTTP import HTTP
-from RPA.JSON import JSON
-from RPA.Tables import Tables
-
-http = HTTP()
-json = JSON()
-table = Tables()
 
 NEWS_JSON_FILE_PATH = "output/news.json"
 
@@ -27,17 +20,17 @@ def create_work_item_payloads():
     payloads.append({
         'search_phrase': 'Carnival',
         'news_category': 'World & Nation',
-        'number_of_months': 12,
+        'number_of_months': 50,
     })
     payloads.append({
         'search_phrase': 'Bitcoin',
         'news_category': '',
-        'number_of_months': 9,
+        'number_of_months': 45,
     })
     payloads.append({
         'search_phrase': 'Elon Musk',
         'news_category': '',
-        'number_of_months': 1,
+        'number_of_months': 100,
     })
 
     return payloads
