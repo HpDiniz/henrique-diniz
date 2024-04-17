@@ -3,23 +3,23 @@ from typing import Tuple, List
 from utils import Utils
 from browser_utils import BrowserUtils
 from file_utils import FileUtils
+import logging
+
 from datetime import datetime
-from dateutil.relativedelta import relativedelta
 from robocorp.tasks import task
 from robocorp import workitems
-from robocorp.tasks import task
 from RPA.HTTP import HTTP
 
 http = HTTP()
 files = FileUtils()
 browser = BrowserUtils()
+logger = logging.getLogger(__name__)
 
 
 @task
 def consume_news_workitems():
     """
-    Inhuman Insurance, Inc. Artificial Intelligence System automation.
-    Consumes news data work items.
+    Consumes news data work items and extract informations about it.
     """
     for item in workitems.inputs:
         try:
@@ -28,24 +28,9 @@ def consume_news_workitems():
         except Exception as e:
             item.fail(message=e)
             close_website()
-            print(e)
+            logger.error(e)
 
     browser._quit_all_drivers()
-
-
-"""
-item.done()
-item.fail(
-    exception_type="APPLICATION",
-    code="TRAFFIC_DATA_POST_FAILED",
-    message=return_json["message"],
-)
-item.fail(
-    exception_type="BUSINESS",
-    code="INVALID_TRAFFIC_DATA",
-    message=item.payload,
-)
-"""
 
 
 def execute_news_extraction(item: workitems.Input):
@@ -76,15 +61,14 @@ def read_payload(item: workitems.Input) -> Tuple[str, str, int]:
 
 def open_website():
 
-    print("abrindo browser")
-    print(datetime.now())
-    browser.open_available_browser(f'https://www.latimes.com', maximized=True)
+    logger.info('Opening browser...')
 
-    print("abriu browser")
-    print(datetime.now())
+    browser.open_available_browser(f'https://www.latimes.com', maximized=True)
 
 
 def search_for_phrase(search_phrase):
+
+    logger.info(f'Searching for phrase "{search_phrase}"...')
 
     browser.click_button_when_visible(
         "css=button[data-element='search-button']")
@@ -99,7 +83,10 @@ def search_for_phrase(search_phrase):
 def change_news_category(news_category):
 
     if not news_category:
+        logger.warn(f'No news category was inputed.')
         return
+
+    logger.info(f'Searching for news category "{news_category}"...')
 
     browser.click_element_if_possible("css=span[class='see-all-text']")
 
@@ -107,8 +94,9 @@ def change_news_category(news_category):
         f"//span[text()='{news_category}']/ancestor::label[input]")
 
     if not category_selected:
-        print(f'Target category "{news_category}" not found.')
+        logger.warn(f'News category "{news_category}" not found.')
     else:
+
         browser.wait_until_page_contains_element(
             'css=div[class="search-results-module-filters-selected"][data-showing="true"]')
 
@@ -116,6 +104,8 @@ def change_news_category(news_category):
 
 
 def sort_by_most_recent_news():
+
+    logger.info(f'Sorting the latest news...')
 
     browser.select_from_list_by_label(
         "css=select[class='select-input']", "Newest")
@@ -125,30 +115,37 @@ def sort_by_most_recent_news():
 
 def get_number_of_pages():
 
+    logger.info(f'Getting the total number of pages...')
+
     pattern = r'(?<=of\s)[\d.,]+'
 
     match = browser.find_pattern_match_in_element(
         'css=div[class="search-results-module-page-counts"]', pattern, when_visible=True)
 
-    return int(match.group().replace(",", "")) if match else 0
+    total_pages = int(match.group().replace(",", "")) if match else 0
+
+    logger.info(f'A total of {total_pages} pages were found.')
+
+    return total_pages
 
 
 def extract_valid_news(worksheet_data: List, search_phrase: str, total_pages: int, number_of_months: int):
 
     limit_date = Utils.get_inferior_date_interval_from_months(number_of_months)
 
-    print(f'Extracting news until {limit_date}...')
+    logger.info(f'Extracting news until {limit_date}...')
 
     for current_page in range(0, total_pages):
 
-        print(f'Current page: {current_page+1}')
+        logger.info(f'Current page: {current_page+1}')
 
         if not extract_news_from_current_page(worksheet_data, search_phrase, limit_date):
-            print("Invalid date reached")
+            logger.info(
+                f'Date limit of interest reached, ending extraction...')
             break
 
         if not go_to_next_page():
-            print("Next page doesn't exist")
+            logger.info(f'Next page button is disabled, ending extraction...')
             break
 
 
@@ -161,8 +158,13 @@ def extract_news_from_current_page(worksheet_data: List, search_phrase: str, lim
 
     pattern = img_pattern + title_pattern + description_pattern + timestamp_pattern
 
+    logger.info(f'Getting news information from page...')
+
     matches = browser.find_pattern_matches_in_element(
         "css=ul[class='search-results-module-results-menu']", pattern, when_visible=True, flags=re.DOTALL)
+
+    logger.info(
+        f'A total of {len(matches)} news items were founded on current page.')
 
     for match in matches:
 
@@ -199,6 +201,8 @@ def extract_news_from_current_page(worksheet_data: List, search_phrase: str, lim
 
 def go_to_next_page() -> bool:
 
+    logger.info(f'Going to next page...')
+
     is_inactive = browser.find_pattern_match_in_element(
         "css=div[class='search-results-module-next-page']", r'data-inactive')
 
@@ -217,6 +221,8 @@ def go_to_next_page() -> bool:
 
 
 def create_excel_file(content, search_phrase):
+
+    logger.info(f'Creating Excel file...')
 
     file_path = f'./output/{search_phrase}.xlsx'
 
@@ -237,30 +243,7 @@ def download_file_from_url(url: str | None, file_name: str):
 
 
 def close_website():
+
+    logger.info(f'Closing website...')
+
     browser.close_browser()
-
-
-"""
-def is_allowed_timestamp(timestamp, number_of_months):
-
-    inferior_limit_date = datetime.now() - relativedelta(months=number_of_months)
-
-    timestamp_date = datetime.fromtimestamp(int(timestamp) / 1000)
-
-    return timestamp_date >= inferior_limit_date
-
-
-def count_search_phrases(title, description, search_phrase):
-    title_counter = len(re.findall(search_phrase, title, flags=re.IGNORECASE))
-    description_counter = len(re.findall(
-        search_phrase, description, flags=re.IGNORECASE))
-    return title_counter + description_counter
-
-
-def contains_monetary(title, description):
-    money_pattern = r'\$[\d,]+(?:\.\d+)?|\d+\s*(?:dollars?|USD)'
-    monetary_title = re.search(money_pattern, title, flags=re.IGNORECASE)
-    monetary_description = re.search(
-        money_pattern, description, flags=re.IGNORECASE)
-    return bool(monetary_title) or bool(monetary_description)
-"""
