@@ -163,9 +163,6 @@ def extract_news_from_current_page(worksheet_data: List, search_phrase: str, lim
     matches = browser.find_pattern_matches_in_element(
         "css=ul[class='search-results-module-results-menu']", pattern, when_visible=True, flags=re.DOTALL)
 
-    logger.info(
-        f'A total of {len(matches)} news items were founded on current page.')
-
     for match in matches:
 
         image_url = match.group(1)
