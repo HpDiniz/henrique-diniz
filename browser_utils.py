@@ -4,7 +4,16 @@ from typing import Match, Iterator, Any
 
 
 class BrowserUtils(Selenium):
+    """
+    Extends Selenium functionality with additional browser automation utilities.
+
+    This class provides a set of utility methods for automating web browser interactions using Selenium.
+    """
+
     def __init__(self):
+        """
+        Initializes BrowserUtils by invoking the constructor of the base class Selenium.
+        """
         super().__init__()
 
     def click_element_if_possible(self, locator: str) -> bool:

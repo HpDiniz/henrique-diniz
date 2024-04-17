@@ -2,16 +2,16 @@ import re
 from typing import Tuple, List
 from utils import Utils
 from browser_utils import BrowserUtils
+from file_utils import FileUtils
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from robocorp.tasks import task
 from robocorp import workitems
 from robocorp.tasks import task
 from RPA.HTTP import HTTP
-from RPA.Excel.Files import Files
 
 http = HTTP()
-files = Files()
+files = FileUtils()
 browser = BrowserUtils()
 
 
@@ -201,11 +201,9 @@ def go_to_next_page() -> bool:
 
 def create_excel_file(content, search_phrase):
 
-    name, file_path = 'Result', f'./output/{search_phrase}.xlsx'
+    file_path = f'./output/{search_phrase}.xlsx'
 
-    files.create_workbook(path=file_path)
-    files.create_worksheet(name=name, content=content, header=True)
-    files.save_workbook(path=file_path)
+    files.create_excel_file_from_json(content, file_path)
 
 
 def download_file_from_url(url: str | None, file_name: str):
