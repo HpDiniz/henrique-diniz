@@ -34,6 +34,7 @@ def consume_news_workitems():
         except Exception as e:
             handle_exception(item, "APPLICATION", e)
 
+    files.delete_files_from_folder(TEMP_PATH)
     browser._quit_all_drivers()
 
 
@@ -52,7 +53,6 @@ def execute_news_extraction(item: workitems.Input):
                        total_pages, number_of_months)
     create_excel_file(worksheet_data, search_phrase)
     create_images_zip_file(worksheet_data, search_phrase)
-    files.delete_files_from_folder(TEMP_PATH)
     close_website()
 
 
