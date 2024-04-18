@@ -73,7 +73,7 @@ class BrowserUtils(Selenium):
         self.wait_until_element_is_visible(locator)
         self.input_text(locator, text)
 
-    def find_pattern_match_in_element(self, locator: str, pattern: Any, when_visible=False, flags=0) -> (Match[str] | None):
+    def find_pattern_match_in_element(self, locator: str, pattern: Any, flags=0, when_visible=False, continue_on_error=False) -> (Match[str] | None):
         """
         Find a match for the given pattern in the text of the element located by the provided locator.
 
@@ -82,21 +82,25 @@ class BrowserUtils(Selenium):
             pattern (Any): Regular expression pattern to search for in the element's text.
             when_visible (bool): If True, waits until the element is visible before searching for the text match.
             flags (int): Optional flags to modify regex behavior (default is 0).
+            continue_on_error (bool): If True, continues execution even if an error occurs.
 
         Returns:
             (Match[str] | None): The first match found in the element's text, or None if no match is found.
         """
+        try:
+            if when_visible:
+                self.wait_until_element_is_visible(locator)
 
-        if when_visible:
-            self.wait_until_element_is_visible(locator)
-
-        element = self.find_element(locator)
-        if element:
-            return re.search(pattern, element.get_attribute('innerHTML'), flags=flags)
+            element = self.find_element(locator)
+            if element:
+                return re.search(pattern, element.get_attribute('innerHTML'), flags=flags)
+        except Exception as e:
+            if not continue_on_error:
+                raise Exception(e)
 
         return None
 
-    def find_pattern_matches_in_element(self, locator: str, pattern: Any, when_visible=False, flags=0) -> (Iterator[Match[str]] | None):
+    def find_pattern_matches_in_element(self, locator: str, pattern: Any, flags=0, when_visible=False, continue_on_error=False) -> (Iterator[Match[str]] | None):
         """
         Find matches for the given pattern in the text of the element located by the provided locator.
 
@@ -105,17 +109,22 @@ class BrowserUtils(Selenium):
             pattern (Any): Regular expression pattern to search for in the element's text.
             when_visible (bool): If True, waits until the element is visible before searching for the text match.
             flags (int): Optional flags to modify regex behavior (default is 0).
+            continue_on_error (bool): If True, continues execution even if an error occurs.
 
         Returns:
             (Iterator[Match[str]] | None): An iterator containing matches found in the element's text, or None if no match is found.
         """
+        try:
+            if when_visible:
+                self.wait_until_element_is_visible(locator)
 
-        if when_visible:
-            self.wait_until_element_is_visible(locator)
+            element = self.find_element(locator)
+            if element:
+                return re.finditer(pattern, element.get_attribute('innerHTML'), flags=flags)
 
-        element = self.find_element(locator)
-        if element:
-            return re.finditer(pattern, element.get_attribute('innerHTML'), flags=flags)
+        except Exception as e:
+            if not continue_on_error:
+                raise Exception(e)
 
         return None
 
@@ -163,3 +172,21 @@ class BrowserUtils(Selenium):
                 "arguments[0].hidden = true;", element)
         except:
             pass
+
+    def element_exists(self, locator: str, timeout: int = None):
+        """
+        Check if an element exists within a specified timeout period.
+
+        Args:
+            locator (str): Locator for the element.
+            timeout (int, optional): Maximum time to wait for the element to appear (in seconds). If None, uses default timeout.
+
+        Returns:
+            bool: True if the element exists within the specified timeout, False otherwise.
+        """
+        try:
+            if timeout:
+                self.wait_until_element_is_enabled(locator, timeout=timeout)
+                return True
+        except:
+            return False

@@ -133,9 +133,9 @@ def get_number_of_pages():
     pattern = r'(?<=of\s)[\d.,]+'
 
     match = browser.find_pattern_match_in_element(
-        'css=div[class="search-results-module-page-counts"]', pattern, when_visible=True)
+        'css=div[class="search-results-module-page-counts"]', pattern, when_visible=False, continue_on_error=True)
 
-    total_pages = int(match.group().replace(",", "")) if match else 0
+    total_pages = int(match.group().replace(",", "")) if match else 1
 
     logger.info(f'A total of {total_pages} pages were found.')
 
@@ -219,19 +219,24 @@ def go_to_next_page() -> bool:
 
     logger.info(f'Going to next page...')
 
+    next_page_locator = "css=div[class='search-results-module-next-page']"
+
+    if browser.element_exists(next_page_locator, 10) is False:
+        return False
+
     is_inactive = browser.find_pattern_match_in_element(
-        "css=div[class='search-results-module-next-page']", r'data-inactive')
+        next_page_locator, r'data-inactive')
 
     if is_inactive:
         return False
 
     browser.scroll_element_into_view(
-        "css=div[class='search-results-module-next-page']")
+        next_page_locator)
 
     browser.remove_element_if_possible(
         "css=modality-custom-element[name='metering-bottompanel']", timeout=10)
 
-    browser.click_element("css=div[class='search-results-module-next-page']")
+    browser.click_element(next_page_locator)
 
     return True
 
