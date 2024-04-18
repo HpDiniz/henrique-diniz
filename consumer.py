@@ -276,7 +276,12 @@ def create_images_zip_file(worksheet_data: Any, search_phrase: str):
 
     files.create_zip_from_files(zip_path, files_to_zip)
 
-    if files.get_megabytes_size_of_directory(OUTPUT_PATH) > 50:
+    if files.count_files_in_directory(OUTPUT_PATH) > 50:
+        files.delete_file(zip_path)
+        raise BusinessException(
+            f'The total number of files exceeds the maximum allowed limit.')
+
+    if files.get_megabytes_size_of_directory(OUTPUT_PATH) > 20:
         files.delete_file(zip_path)
         raise BusinessException(
             f'The size of {search_phrase}.zip exceeds the maximum allowed limit in megabytes.')

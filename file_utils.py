@@ -93,6 +93,21 @@ class FileUtils(Files):
         total_size_mb = total_size_bytes / (1024 * 1024)
         return total_size_mb
 
+    def count_files_in_directory(self, path: str) -> int:
+        """
+        Count the number of files present in a given directory.
+
+        Args:
+            path (str): The path to the directory.
+
+        Returns:
+            int: The total number of files in the directory.
+        """
+        file_count = 0
+        for _, _, filenames in os.walk(path):
+            file_count += len(filenames)
+        return file_count
+
     def create_folder(self, path: str):
         """
         Create a folder at the specified path if it does not exist.
