@@ -1,21 +1,24 @@
 
 import re
+import logging
+from RPA.HTTP import HTTP
+from datetime import datetime
+from robocorp import workitems
+from robocorp.tasks import task
 from typing import Tuple, List, Any
+
 from utils import Utils
+from file_utils import FileUtils
 from browser_utils import BrowserUtils
 from business_exception import BusinessException
-from file_utils import FileUtils
-import logging
-
-from datetime import datetime
-from robocorp.tasks import task
-from robocorp import workitems
-from RPA.HTTP import HTTP
 
 http = HTTP()
 files = FileUtils()
 browser = BrowserUtils()
+
+logging.basicConfig(format='[%(levelname)s] - %(message)s')
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 TEMP_PATH = 'temp'
 OUTPUT_PATH = 'output'
@@ -35,7 +38,6 @@ def consume_news_workitems():
             handle_exception(item, "APPLICATION", e)
 
     files.delete_files_from_folder(TEMP_PATH)
-    browser._quit_all_drivers()
 
 
 def execute_news_extraction(item: workitems.Input):
