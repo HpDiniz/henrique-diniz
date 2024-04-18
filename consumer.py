@@ -61,9 +61,14 @@ def execute_news_extraction(item: workitems.Input):
 
 
 def read_payload(item: workitems.Input) -> Tuple[str, str, int]:
-    """Reads the payload of a work item and returns search phrase, news category, and number of months."""
+    """Reads the payload of a work item and returns search phrase, news cate    gory, and number of months."""
+
+    logger.info('Reading payload...')
 
     news_data = item.payload["news_data"]
+
+    logger.info(news_data)
+
     search_phrase = str(news_data["search_phrase"])
     news_category = str(news_data["news_category"])
     number_of_months = int(news_data["number_of_months"])
