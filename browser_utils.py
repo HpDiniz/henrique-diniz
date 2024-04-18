@@ -173,7 +173,7 @@ class BrowserUtils(Selenium):
         except:
             pass
 
-    def element_exists(self, locator: str, timeout: int = None):
+    def element_exists(self, locator: str, timeout: int = None) -> bool:
         """
         Check if an element exists within a specified timeout period.
 
