@@ -1,7 +1,9 @@
+
 import re
-from typing import Tuple, List
+from typing import Tuple, List, Any
 from utils import Utils
 from browser_utils import BrowserUtils
+from business_exception import BusinessException
 from file_utils import FileUtils
 import logging
 
@@ -15,25 +17,28 @@ files = FileUtils()
 browser = BrowserUtils()
 logger = logging.getLogger(__name__)
 
+TEMP_PATH = 'temp'
+OUTPUT_PATH = 'output'
+
 
 @task
 def consume_news_workitems():
-    """
-    Consumes news data work items and extract informations about it.
-    """
+    """Consumes news work items, executes news extraction for each item, marks them as done or failed."""
+
     for item in workitems.inputs:
         try:
             execute_news_extraction(item)
             item.done()
+        except BusinessException as e:
+            handle_exception(item, "BUSINESS", e)
         except Exception as e:
-            item.fail(message=e)
-            close_website()
-            logger.error(e)
+            handle_exception(item, "APPLICATION", e)
 
     browser._quit_all_drivers()
 
 
 def execute_news_extraction(item: workitems.Input):
+    """Executes the process of extracting news based on the provided work item."""
 
     worksheet_data = []
     search_phrase, news_category, number_of_months = read_payload(item)
@@ -46,10 +51,13 @@ def execute_news_extraction(item: workitems.Input):
     extract_valid_news(worksheet_data, search_phrase,
                        total_pages, number_of_months)
     create_excel_file(worksheet_data, search_phrase)
+    create_images_zip_file(worksheet_data, search_phrase)
+    files.delete_files_from_folder(TEMP_PATH)
     close_website()
 
 
 def read_payload(item: workitems.Input) -> Tuple[str, str, int]:
+    """Reads the payload of a work item and returns search phrase, news category, and number of months."""
 
     news_data = item.payload["news_data"]
     search_phrase = str(news_data["search_phrase"])
@@ -60,6 +68,7 @@ def read_payload(item: workitems.Input) -> Tuple[str, str, int]:
 
 
 def open_website():
+    """Opens the browser and navigates to the specified website."""
 
     logger.info('Opening browser...')
 
@@ -67,6 +76,7 @@ def open_website():
 
 
 def search_for_phrase(search_phrase):
+    """Enters the search phrase into the search bar of the website."""
 
     logger.info(f'Searching for phrase "{search_phrase}"...')
 
@@ -81,6 +91,7 @@ def search_for_phrase(search_phrase):
 
 
 def change_news_category(news_category):
+    """Changes the news category on the website if provided."""
 
     if not news_category:
         logger.warn(f'No news category was inputed.')
@@ -104,6 +115,7 @@ def change_news_category(news_category):
 
 
 def sort_by_most_recent_news():
+    """Navigates to the given URL"""
 
     logger.info(f'Sorting the latest news...')
 
@@ -114,6 +126,7 @@ def sort_by_most_recent_news():
 
 
 def get_number_of_pages():
+    """Sorts the news by most recent on the website."""
 
     logger.info(f'Getting the total number of pages...')
 
@@ -130,6 +143,7 @@ def get_number_of_pages():
 
 
 def extract_valid_news(worksheet_data: List, search_phrase: str, total_pages: int, number_of_months: int):
+    """Retrieves the total number of pages of news articles."""
 
     limit_date = Utils.get_inferior_date_interval_from_months(number_of_months)
 
@@ -150,6 +164,7 @@ def extract_valid_news(worksheet_data: List, search_phrase: str, total_pages: in
 
 
 def extract_news_from_current_page(worksheet_data: List, search_phrase: str, limit_date: datetime) -> bool:
+    """Extracts valid news articles within the specified timeframe."""
 
     img_pattern = r'(?:<img.*?src=\"(.*?)\".*?)?'
     title_pattern = r'class="promo-title">\s+<a.*?>(.*?)<\/a>.*?'
@@ -169,6 +184,9 @@ def extract_news_from_current_page(worksheet_data: List, search_phrase: str, lim
         title = match.group(2)
         description = match.group(3)
         news_date = Utils.get_date_from_timestamp(match.group(4))
+
+        if any(news_item['title'] == title and news_item['description'] == description for news_item in worksheet_data):
+            continue
 
         if news_date < limit_date:
             return False
@@ -197,6 +215,7 @@ def extract_news_from_current_page(worksheet_data: List, search_phrase: str, lim
 
 
 def go_to_next_page() -> bool:
+    """Extracts news articles from the current page of the website."""
 
     logger.info(f'Going to next page...')
 
@@ -217,30 +236,59 @@ def go_to_next_page() -> bool:
     return True
 
 
-def create_excel_file(content, search_phrase):
+def close_website():
+    """Closes the website."""
+
+    logger.info(f'Closing website...')
+
+    browser.close_browser()
+
+
+def create_excel_file(worksheet_data: Any, search_phrase: str):
+    """Creates an Excel file containing the extracted news data."""
 
     logger.info(f'Creating Excel file...')
 
-    file_path = f'./output/{search_phrase}.xlsx'
+    excel_path = f'{TEMP_PATH}/{search_phrase}.xlsx'
 
-    files.create_excel_file_from_json(content, file_path)
+    files.create_excel_file_from_json(worksheet_data, excel_path)
+
+
+def create_images_zip_file(worksheet_data: Any, search_phrase: str):
+    """Creates a zip file containing images and Excel file of the extracted news data."""
+
+    logger.info(f'Creating Zip file...')
+
+    zip_path = f'{OUTPUT_PATH}/{search_phrase}.zip'
+
+    files_to_zip = [
+        f"{TEMP_PATH}/{data['picture file']}" for data in worksheet_data if data['picture file'] != '-']
+    files_to_zip.append(f'{TEMP_PATH}/{search_phrase}.xlsx')
+
+    files.create_zip_from_files(zip_path, files_to_zip)
+
+    if files.get_megabytes_size_of_directory(OUTPUT_PATH) > 50:
+        files.delete_file(zip_path)
+        raise BusinessException(
+            f'The size of {search_phrase}.zip exceeds the maximum allowed limit in megabytes.')
 
 
 def download_file_from_url(url: str | None, file_name: str):
+    """Downloads a file from a given URL and saves it with the specified name."""
 
     if url is None:
         return '-'
 
     http.download(
         url=url,
-        target_file=f'output/{file_name}',
+        target_file=f'{TEMP_PATH}/{file_name}',
         overwrite=True)
 
     return file_name
 
 
-def close_website():
-
-    logger.info(f'Closing website...')
-
-    browser.close_browser()
+def handle_exception(item: workitems.Input, exception_type: str, exception: Exception):
+    """Handles exceptions occurring during news extraction process."""
+    item.fail(exception_type=exception_type, message=str(exception))
+    logger.error(exception)
+    close_website()

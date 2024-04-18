@@ -1,4 +1,6 @@
-from typing import Any
+import os
+import zipfile
+from typing import Any, List
 from RPA.Excel.Files import Files
 
 
@@ -32,3 +34,61 @@ class FileUtils(Files):
         self.create_workbook(path=path)
         self.create_worksheet(name=tab_name, content=json, header=True)
         self.save_workbook(path=path)
+
+    def create_zip_from_files(self, zip_path: str, files: List):
+
+        with zipfile.ZipFile(zip_path, 'w') as zip_file:
+            for file in files:
+                zip_file.write(file, os.path.basename(file))
+
+    def delete_files_from_folder(self, path: str):
+        """
+        Deletes all files within a folder.
+
+        Args:
+        - path (str): The path to the folder.
+
+        Returns:
+            None
+        """
+
+        if not os.path.isdir(path):
+            return
+
+        files = os.listdir(path)
+
+        for file in files:
+            file_path = os.path.join(path, file)
+            if os.path.isfile(file_path):
+                os.remove(file_path)
+
+    def delete_file(self, path: str):
+        """
+        Delete a file from the file system.
+
+        Args:
+            path (str): The path to the file to be deleted.
+
+        Returns:
+            None
+        """
+        os.remove(path)
+
+    def get_megabytes_size_of_directory(self, path: str) -> float:
+        """
+        Calculate the total size of a directory in megabytes.
+
+        Args:
+            path (str): The path to the directory.
+
+        Returns:
+            float: The total size of the directory in megabytes.
+        """
+        total_size_bytes = 0
+        for dirpath, dirnames, filenames in os.walk(path):
+            for filename in filenames:
+                filepath = os.path.join(dirpath, filename)
+                if os.path.isfile(filepath):
+                    total_size_bytes += os.path.getsize(filepath)
+        total_size_mb = total_size_bytes / (1024 * 1024)
+        return total_size_mb
