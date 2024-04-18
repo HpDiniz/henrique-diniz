@@ -92,3 +92,13 @@ class FileUtils(Files):
                     total_size_bytes += os.path.getsize(filepath)
         total_size_mb = total_size_bytes / (1024 * 1024)
         return total_size_mb
+
+    def create_folder(self, path: str):
+        """
+        Create a folder at the specified path if it does not exist.
+
+        Args:
+            path (str): The path where the folder should be created.
+        """
+        if not os.path.exists(path):
+            os.makedirs(path)

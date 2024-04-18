@@ -22,6 +22,8 @@ logger.setLevel(logging.INFO)
 
 TEMP_PATH = 'temp'
 OUTPUT_PATH = 'output'
+files.create_folder(TEMP_PATH)
+files.create_folder(OUTPUT_PATH)
 
 
 @task
