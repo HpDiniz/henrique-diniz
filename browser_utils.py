@@ -185,8 +185,7 @@ class BrowserUtils(Selenium):
             bool: True if the element exists within the specified timeout, False otherwise.
         """
         try:
-            if timeout:
-                self.wait_until_element_is_enabled(locator, timeout=timeout)
-                return True
+            self.wait_until_element_is_enabled(locator, timeout=timeout)
+            return True
         except:
             return False
