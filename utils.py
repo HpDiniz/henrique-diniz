@@ -1,5 +1,4 @@
 import re
-
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -9,18 +8,19 @@ class Utils():
     Collection of utility functions for common tasks.
     """
 
-    def get_inferior_date_interval_from_months(number_of_months: int) -> datetime:
+    def get_inferior_date_interval_from_months(number_of_months: str | int) -> datetime:
         """
         Calculate the start date of an interval by subtracting a number of months from the current date.
 
         Args:
-            number_of_months (int): Number of months to subtract.
+            number_of_months (str | int): Number of months to subtract.
 
         Returns:
             datetime: Start date of the interval.
         """
         current_date = datetime.today().replace(day=1, hour=0, minute=0, second=0)
         target_date = current_date.replace(day=1)
+        number_of_months = int(number_of_months)
 
         if number_of_months > 0:
             number_of_months = number_of_months - 1
